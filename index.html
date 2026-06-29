@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Anti-Cheat SDK | Enterprise-Grade Game Integrity by Jayson Quindao</title>
+  <meta name="description" content="A lightweight, zero-overhead process scanning and active-window focus tracking SDK for Windows and macOS. Built for indie studios and enterprise game publishers.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #030712;
+      --surface: rgba(15,15,25,0.8);
+      --border: rgba(255,255,255,0.07);
+      --accent: #6366f1;
+      --accent2: #22d3ee;
+      --green: #10b981;
+      --text: #f1f5f9;
+      --muted: #64748b;
+    }
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family:'Inter',sans-serif; background:var(--bg); color:var(--text); overflow-x:hidden; }
+
+    /* BG */
+    .bg-fx { position:fixed; inset:0; z-index:-1; }
+    .orb { position:absolute; border-radius:50%; filter:blur(140px); opacity:.35; }
+    .orb1 { width:700px;height:700px;background:radial-gradient(circle,#6366f1,transparent);top:-200px;right:-100px; }
+    .orb2 { width:500px;height:500px;background:radial-gradient(circle,#22d3ee,transparent);bottom:-100px;left:-100px; }
+    .grid { position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.025) 1px,transparent 1px);background-size:60px 60px; }
+
+    /* NAV */
+    nav { position:fixed;top:0;width:100%;z-index:100;padding:20px 6%;display:flex;justify-content:space-between;align-items:center;background:rgba(3,7,18,.6);backdrop-filter:blur(16px);border-bottom:1px solid var(--border); }
+    .logo { font-weight:900;font-size:1.1rem;letter-spacing:-0.5px; }
+    .logo span { color:var(--accent); }
+    nav a { color:var(--muted);text-decoration:none;margin-left:2rem;font-size:.875rem;font-weight:600;transition:color .2s; }
+    nav a:hover { color:var(--text); }
+    .nav-cta { background:var(--accent);color:#fff !important;padding:8px 20px;border-radius:8px; }
+    .nav-cta:hover { opacity:.9; }
+
+    /* HERO */
+    .hero { min-height:100vh;display:flex;align-items:center;justify-content:center;text-align:center;padding:120px 6% 80px; }
+    .hero-inner { max-width:800px; }
+    .badge { display:inline-flex;align-items:center;gap:8px;background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.3);color:var(--accent);padding:6px 16px;border-radius:20px;font-size:.8rem;font-family:'JetBrains Mono',monospace;margin-bottom:2rem; }
+    .badge-dot { width:7px;height:7px;background:var(--green);border-radius:50%;box-shadow:0 0 8px var(--green);animation:pulse 2s infinite; }
+    h1 { font-size:clamp(2.5rem,6vw,4.5rem);line-height:1.08;letter-spacing:-2px;margin-bottom:1.5rem; }
+    .grad { background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent; }
+    .hero p { font-size:1.2rem;color:var(--muted);max-width:580px;margin:0 auto 2.5rem;line-height:1.7; }
+    .btn-row { display:flex;gap:1rem;justify-content:center;flex-wrap:wrap; }
+    .btn { padding:14px 32px;border-radius:10px;font-weight:700;font-size:.95rem;text-decoration:none;transition:all .25s;cursor:pointer;border:none; }
+    .btn-primary { background:linear-gradient(135deg,var(--accent),#818cf8);color:#fff;box-shadow:0 4px 20px rgba(99,102,241,.35); }
+    .btn-primary:hover { transform:translateY(-2px);box-shadow:0 8px 30px rgba(99,102,241,.5); }
+    .btn-secondary { background:transparent;color:var(--text);border:1px solid var(--border); }
+    .btn-secondary:hover { border-color:rgba(255,255,255,.2);background:rgba(255,255,255,.05); }
+
+    /* STATS */
+    .stats { display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1px;background:var(--border);border:1px solid var(--border);border-radius:16px;overflow:hidden;margin:4rem 6%; }
+    .stat { background:var(--surface);padding:2rem;text-align:center;backdrop-filter:blur(12px); }
+    .stat-num { font-size:2.5rem;font-weight:900;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;display:block; }
+    .stat-label { color:var(--muted);font-size:.85rem;margin-top:.25rem; }
+
+    /* FEATURES */
+    .section { padding:80px 6%; max-width:1200px;margin:0 auto; }
+    .section-label { font-family:'JetBrains Mono',monospace;color:var(--accent);font-size:.8rem;letter-spacing:.1em;text-transform:uppercase;margin-bottom:.75rem; }
+    .section h2 { font-size:clamp(1.8rem,3.5vw,2.8rem);letter-spacing:-1px;margin-bottom:1rem; }
+    .section-sub { color:var(--muted);font-size:1.05rem;max-width:560px;line-height:1.7;margin-bottom:3rem; }
+    .features-grid { display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:1.5rem; }
+    .feat-card { background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:2rem;backdrop-filter:blur(12px);transition:border-color .3s,transform .3s; }
+    .feat-card:hover { border-color:rgba(99,102,241,.4);transform:translateY(-4px); }
+    .feat-icon { font-size:1.8rem;margin-bottom:1rem; }
+    .feat-card h3 { font-size:1.1rem;margin-bottom:.5rem; }
+    .feat-card p { color:var(--muted);font-size:.9rem;line-height:1.65; }
+
+    /* CODE BLOCK */
+    .code-section { padding:80px 6%;background:rgba(99,102,241,.03);border-top:1px solid var(--border);border-bottom:1px solid var(--border); }
+    .code-inner { max-width:900px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr;gap:4rem;align-items:center; }
+    .code-block { background:#0d0d1a;border:1px solid var(--border);border-radius:12px;overflow:hidden; }
+    .code-header { background:rgba(255,255,255,.04);padding:12px 16px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border); }
+    .dot { width:11px;height:11px;border-radius:50%; }
+    .r{background:#ff5f56;} .y{background:#ffbd2e;} .g{background:#27c93f;}
+    .code-title { margin-left:auto;margin-right:auto;font-family:'JetBrains Mono',monospace;font-size:.75rem;color:var(--muted); }
+    pre { padding:1.5rem;font-family:'JetBrains Mono',monospace;font-size:.85rem;line-height:1.75;overflow-x:auto; }
+    .kw{color:#818cf8;} .fn{color:#22d3ee;} .str{color:#10b981;} .cm{color:#475569;}
+
+    /* PRICING */
+    .pricing-grid { display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1.5rem; }
+    .price-card { background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:2.5rem;backdrop-filter:blur(12px);position:relative;transition:transform .3s; }
+    .price-card:hover { transform:translateY(-6px); }
+    .price-card.featured { border-color:var(--accent);box-shadow:0 0 40px rgba(99,102,241,.15); }
+    .featured-badge { position:absolute;top:-12px;left:50%;transform:translateX(-50%);background:var(--accent);color:#fff;font-size:.75rem;font-weight:700;padding:4px 16px;border-radius:20px; }
+    .tier { font-size:.8rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:.75rem; }
+    .price { font-size:3rem;font-weight:900;letter-spacing:-2px;margin-bottom:.25rem; }
+    .price span { font-size:1rem;font-weight:400;color:var(--muted); }
+    .price-desc { color:var(--muted);font-size:.875rem;margin-bottom:1.5rem;padding-bottom:1.5rem;border-bottom:1px solid var(--border); }
+    .price-features { list-style:none;margin-bottom:2rem; }
+    .price-features li { padding:.5rem 0;font-size:.9rem;color:var(--muted);display:flex;gap:.5rem; }
+    .price-features li::before { content:"✓";color:var(--green);font-weight:700; }
+    .price-btn { display:block;text-align:center;padding:12px;border-radius:10px;font-weight:700;text-decoration:none;transition:all .25s;font-size:.9rem; }
+    .price-btn-primary { background:var(--accent);color:#fff; }
+    .price-btn-primary:hover { opacity:.9; }
+    .price-btn-secondary { border:1px solid var(--border);color:var(--text); }
+    .price-btn-secondary:hover { background:rgba(255,255,255,.05); }
+
+    /* CTA */
+    .cta-section { padding:100px 6%;text-align:center; }
+    .cta-inner { max-width:640px;margin:0 auto;background:var(--surface);border:1px solid var(--border);border-radius:24px;padding:4rem;backdrop-filter:blur(20px); }
+    .cta-inner h2 { font-size:2.2rem;letter-spacing:-1px;margin-bottom:1rem; }
+    .cta-inner p { color:var(--muted);margin-bottom:2rem;line-height:1.7; }
+    .email-form { display:flex;gap:.75rem;flex-wrap:wrap;justify-content:center; }
+    .email-form input { flex:1;min-width:240px;background:rgba(0,0,0,.4);border:1px solid var(--border);padding:12px 16px;border-radius:8px;color:var(--text);font-size:.9rem;outline:none;transition:border-color .2s; }
+    .email-form input:focus { border-color:var(--accent); }
+    .email-form input::placeholder { color:var(--muted); }
+
+    footer { padding:2rem 6%;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;color:var(--muted);font-size:.85rem; }
+
+    @keyframes pulse { 0%{box-shadow:0 0 0 0 rgba(16,185,129,.7)} 70%{box-shadow:0 0 0 8px transparent} 100%{box-shadow:0 0 0 0 transparent} }
+    @media(max-width:768px) { .code-inner{grid-template-columns:1fr;} footer{flex-direction:column;gap:1rem;text-align:center;} }
+  </style>
+</head>
+<body>
+<div class="bg-fx">
+  <div class="orb orb1"></div>
+  <div class="orb orb2"></div>
+  <div class="grid"></div>
+</div>
+
+<nav>
+  <div class="logo">Anti<span>Cheat</span>SDK</div>
+  <div>
+    <a href="#features">Features</a>
+    <a href="#pricing">Pricing</a>
+    <a href="https://github.com/djjrip/anti-cheat-sdk" target="_blank">GitHub</a>
+    <a href="#contact" class="nav-cta">Get a Demo</a>
+  </div>
+</nav>
+
+<section class="hero">
+  <div class="hero-inner">
+    <div class="badge"><span class="badge-dot"></span> SDK v2.1 — Windows & macOS</div>
+    <h1>Game Integrity.<br><span class="grad">Zero Overhead.</span></h1>
+    <p>A lightweight process scanning and active-window focus tracking SDK. Drop it in, protect your game, ship faster. Built for indie studios to enterprise publishers.</p>
+    <div class="btn-row">
+      <a href="#pricing" class="btn btn-primary">View Pricing</a>
+      <a href="https://github.com/djjrip/anti-cheat-sdk" target="_blank" class="btn btn-secondary">View on GitHub →</a>
+    </div>
+  </div>
+</section>
+
+<div class="stats">
+  <div class="stat"><span class="stat-num">~0ms</span><div class="stat-label">Performance Overhead</div></div>
+  <div class="stat"><span class="stat-num">2</span><div class="stat-label">Platforms (Win + macOS)</div></div>
+  <div class="stat"><span class="stat-num">1</span><div class="stat-label">Line to Initialize</div></div>
+  <div class="stat"><span class="stat-num">MIT</span><div class="stat-label">Core License</div></div>
+</div>
+
+<section class="section" id="features">
+  <div class="section-label">// Core Capabilities</div>
+  <h2>Everything your game needs.<br>Nothing it doesn't.</h2>
+  <p class="section-sub">Built from the ground up to be invisible to the player and lethal to cheaters.</p>
+  <div class="features-grid">
+    <div class="feat-card">
+      <div class="feat-icon">🔍</div>
+      <h3>Process Scanner</h3>
+      <p>Real-time scanning of running processes against a configurable blocklist. Detects Cheat Engine, aimbots, memory editors, and custom exploit tools on process launch.</p>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon">🪟</div>
+      <h3>Active Window Focus Tracking</h3>
+      <p>Detect when a player alt-tabs to a known cheat tool, macro software, or overlay injector mid-session. Flag or disconnect instantly.</p>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon">⚡</div>
+      <h3>Zero-Overhead Architecture</h3>
+      <p>Runs in a dedicated background thread. No blocking calls on the game loop. Proven to add &lt;0.1% CPU overhead on both Windows and macOS.</p>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon">🔒</div>
+      <h3>Tamper Detection</h3>
+      <p>Detects debugger attachment, memory patching, and known injection patterns. Triggers configurable callbacks when integrity is violated.</p>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon">📡</div>
+      <h3>Webhook Reporting</h3>
+      <p>POST violation events to your backend, Discord server, or admin dashboard in real time. Full session context included in every payload.</p>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon">🧩</div>
+      <h3>Drop-In Integration</h3>
+      <p>Single initialization call. Works with Unity, Unreal, Electron, and raw native apps. TypeScript, C, and C++ bindings included.</p>
+    </div>
+  </div>
+</section>
+
+<div class="code-section" id="code">
+  <div class="code-inner">
+    <div>
+      <div class="section-label">// Integration</div>
+      <h2 style="letter-spacing:-1px;font-size:2rem;margin-bottom:1rem;">Integrate in<br>under 5 minutes.</h2>
+      <p style="color:var(--muted);line-height:1.7;">One import. One initialization call. The SDK handles everything else autonomously — scanning, flagging, and reporting — without touching your game loop.</p>
+    </div>
+    <div class="code-block">
+      <div class="code-header">
+        <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+        <span class="code-title">game-session.ts</span>
+      </div>
+      <pre><span class="kw">import</span> { <span class="fn">AntiCheatSDK</span> } <span class="kw">from</span> <span class="str">'@djjrip/anti-cheat-sdk'</span>;
+
+<span class="cm">// Initialize once on game start</span>
+<span class="kw">const</span> guard = <span class="kw">new</span> <span class="fn">AntiCheatSDK</span>({
+  sessionId: player.id,
+  webhookUrl: <span class="str">'https://api.ggloop.io/cheat-events'</span>,
+  scanInterval: <span class="str">5000</span>,
+  blocklist: [<span class="str">'cheatengine'</span>, <span class="str">'artmoney'</span>],
+});
+
+guard.<span class="fn">on</span>(<span class="str">'violation'</span>, (event) => {
+  <span class="cm">// Disconnect, flag, or warn the player</span>
+  session.<span class="fn">flagPlayer</span>(event.playerId, event.reason);
+});
+
+guard.<span class="fn">start</span>();</pre>
+    </div>
+  </div>
+</div>
+
+<section class="section" id="pricing">
+  <div class="section-label">// Pricing</div>
+  <h2>Simple, honest pricing.</h2>
+  <p class="section-sub">Start free. Scale when you need it. No per-MAU traps.</p>
+  <div class="pricing-grid">
+    <div class="price-card">
+      <div class="tier">Indie</div>
+      <div class="price">$99<span>/mo</span></div>
+      <div class="price-desc">For solo devs and small studios shipping their first game.</div>
+      <ul class="price-features">
+        <li>Up to 1,000 CCU</li>
+        <li>Process scanning + focus tracking</li>
+        <li>Webhook reporting</li>
+        <li>Email support</li>
+        <li>1 game title</li>
+      </ul>
+      <a href="mailto:jayson@ggloop.io?subject=Anti-Cheat SDK - Indie Plan" class="price-btn price-btn-secondary">Get Started</a>
+    </div>
+    <div class="price-card featured">
+      <div class="featured-badge">Most Popular</div>
+      <div class="tier">Studio</div>
+      <div class="price">$499<span>/mo</span></div>
+      <div class="price-desc">For growing studios with live games and real players.</div>
+      <ul class="price-features">
+        <li>Up to 50,000 CCU</li>
+        <li>All Indie features</li>
+        <li>Tamper detection</li>
+        <li>Admin dashboard access</li>
+        <li>Up to 5 game titles</li>
+        <li>Slack/Discord alerts</li>
+        <li>Priority support</li>
+      </ul>
+      <a href="mailto:jayson@ggloop.io?subject=Anti-Cheat SDK - Studio Plan" class="price-btn price-btn-primary">Start Free Trial</a>
+    </div>
+    <div class="price-card">
+      <div class="tier">Enterprise</div>
+      <div class="price">$2K<span>/mo</span></div>
+      <div class="price-desc">For publishers, platform operators, and esports orgs.</div>
+      <ul class="price-features">
+        <li>Unlimited CCU</li>
+        <li>All Studio features</li>
+        <li>Custom blocklist rules</li>
+        <li>SLA guarantee (99.9%)</li>
+        <li>Unlimited game titles</li>
+        <li>Dedicated Slack channel</li>
+        <li>Custom integration support</li>
+      </ul>
+      <a href="mailto:jayson@ggloop.io?subject=Anti-Cheat SDK - Enterprise" class="price-btn price-btn-secondary">Contact Sales</a>
+    </div>
+  </div>
+</section>
+
+<section class="cta-section" id="contact">
+  <div class="cta-inner">
+    <h2>Ready to ship<br>a cleaner game?</h2>
+    <p>Get a personalized integration walkthrough with Jayson. Most studios are live within 48 hours.</p>
+    <div class="email-form">
+      <input type="email" placeholder="your@studio.com" id="email-input">
+      <a href="#" class="btn btn-primary" onclick="window.location='mailto:jayson@ggloop.io?subject=Anti-Cheat SDK Demo Request&body=My email: '+document.getElementById('email-input').value">Request Demo</a>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <span>© 2026 Jayson Quindao — AntiCheat SDK</span>
+  <span>Built on top of <a href="https://github.com/djjrip/anti-cheat-sdk" style="color:var(--accent);text-decoration:none;">open source ↗</a></span>
+</footer>
+</body>
+</html>
