@@ -1,0 +1,35 @@
+{
+  "name": "@djjrip/anti-cheat-sdk",
+  "version": "1.0.0",
+  "description": "Production-grade AntiCheat SDK for real-time process scanning, focus tracking, and webhook violation reporting.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist/**/*"
+  ],
+  "scripts": {
+    "build": "node node_modules/typescript/bin/tsc",
+    "prepublishOnly": "npm run build",
+    "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\""
+  },
+  "keywords": [
+    "anticheat",
+    "anti-cheat",
+    "game-security",
+    "process-scanner",
+    "cheat-detection"
+  ],
+  "author": "djjrip",
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^5.5.0",
+    "@types/node": ">=16"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/djjrip/anti-cheat-sdk"
+  }
+}
