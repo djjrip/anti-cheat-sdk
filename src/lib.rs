@@ -175,6 +175,13 @@ pub fn is_process_in_foreground(process_name: &str) -> bool {
 /// Detect active game process from a list of configs
 pub fn detect_active_game(games: &[GameConfig]) -> Option<(GameConfig, String)> {
     let running = get_running_processes();
+    detect_active_game_in(games, &running)
+}
+
+/// Pure, OS-independent matching logic behind `detect_active_game`. Separated out so it
+/// can be unit tested without depending on the real OS process list (`get_running_processes`
+/// shells out / calls Win32 APIs and can't be exercised in a normal `cargo test` run).
+pub fn detect_active_game_in(games: &[GameConfig], running: &[String]) -> Option<(GameConfig, String)> {
     let running_lower: Vec<String> = running.iter().map(|p| p.to_lowercase()).collect();
 
     for game in games {
@@ -187,4 +194,90 @@ pub fn detect_active_game(games: &[GameConfig]) -> Option<(GameConfig, String)> 
         }
     }
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn game(id: &str, processes: &[&str], enabled: bool) -> GameConfig {
+        GameConfig {
+            id: id.into(),
+            name: id.into(),
+            processes: processes.iter().map(|p| p.to_string()).collect(),
+            enabled,
+        }
+    }
+
+    #[test]
+    fn default_games_have_unique_non_empty_ids() {
+        let games = default_games();
+        assert!(!games.is_empty(), "expected a non-empty default game list");
+
+        let mut ids: Vec<&str> = games.iter().map(|g| g.id.as_str()).collect();
+        ids.sort();
+        ids.dedup();
+        assert_eq!(ids.len(), games.len(), "default_games() contains duplicate ids");
+
+        for g in &games {
+            assert!(!g.id.is_empty(), "game id must not be empty");
+            assert!(!g.name.is_empty(), "game name must not be empty");
+            assert!(!g.processes.is_empty(), "{} has no process names configured", g.id);
+        }
+    }
+
+    #[test]
+    fn detects_exact_process_match() {
+        let games = vec![game("valorant", &["VALORANT-Win64-Shipping.exe"], true)];
+        let running = vec!["VALORANT-Win64-Shipping.exe".to_string()];
+        let result = detect_active_game_in(&games, &running);
+        assert!(result.is_some());
+        let (matched_game, matched_process) = result.unwrap();
+        assert_eq!(matched_game.id, "valorant");
+        assert_eq!(matched_process, "VALORANT-Win64-Shipping.exe");
+    }
+
+    #[test]
+    fn match_is_case_insensitive() {
+        let games = vec![game("cs2", &["cs2.exe"], true)];
+        let running = vec!["CS2.EXE".to_string()];
+        assert!(detect_active_game_in(&games, &running).is_some());
+    }
+
+    #[test]
+    fn ignores_disabled_games() {
+        let games = vec![game("fortnite", &["FortniteClient-Win64-Shipping.exe"], false)];
+        let running = vec!["FortniteClient-Win64-Shipping.exe".to_string()];
+        assert!(detect_active_game_in(&games, &running).is_none());
+    }
+
+    #[test]
+    fn returns_none_when_nothing_matches() {
+        let games = default_games();
+        let running = vec!["notepad.exe".to_string(), "explorer.exe".to_string()];
+        assert!(detect_active_game_in(&games, &running).is_none());
+    }
+
+    #[test]
+    fn returns_first_enabled_match_in_priority_order() {
+        // Two games sharing a process name shouldn't happen in practice, but the matcher
+        // should still be deterministic: first configured (enabled) game wins.
+        let games = vec![
+            game("game-a", &["shared.exe"], true),
+            game("game-b", &["shared.exe"], true),
+        ];
+        let running = vec!["shared.exe".to_string()];
+        let (matched, _) = detect_active_game_in(&games, &running).unwrap();
+        assert_eq!(matched.id, "game-a");
+    }
+
+    #[test]
+    fn suffix_match_handles_full_path_process_names() {
+        // get_running_processes() can return full paths on some platforms; the `ends_with`
+        // branch exists to handle that — verify it actually works.
+        let games = vec![game("dota2", &["dota2.exe"], true)];
+        let running =
+            vec!["C:\\Games\\Steam\\steamapps\\common\\dota 2 beta\\game\\dota2.exe".to_string()];
+        assert!(detect_active_game_in(&games, &running).is_some());
+    }
 }
