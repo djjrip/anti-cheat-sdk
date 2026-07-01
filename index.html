@@ -227,21 +227,22 @@ guard.<span class="fn">start</span>();</pre>
   <h2>Simple, honest pricing.</h2>
   <p class="section-sub">Start free. Scale when you need it. No per-MAU traps.</p>
   <div class="pricing-grid">
-    <div class="price-card">
-      <div class="tier">Indie</div>
-      <div class="price">$99<span>/mo</span></div>
-      <div class="price-desc">For solo devs and small studios shipping their first game.</div>
+    <div class="price-card featured" style="border: 1px solid var(--accent);">
+      <div class="featured-badge" style="background: var(--accent); color: #000;">Founding Offer</div>
+      <div class="tier">Founding Member</div>
+      <div class="price">$29<span>/mo</span></div>
+      <div class="price-desc">Special early-bird rate for founding members. Fully automated.</div>
       <ul class="price-features">
-        <li>Up to 1,000 CCU</li>
-        <li>Process scanning + focus tracking</li>
-        <li>Webhook reporting</li>
-        <li>Email support</li>
-        <li>1 game title</li>
+        <li>Unlimited process scanning</li>
+        <li>Focus tracking + memory tamper logs</li>
+        <li>Instant API key delivery</li>
+        <li>Dashboard control panel access</li>
+        <li>Stripe secure automatic billing</li>
+        <li>Direct support channel</li>
       </ul>
-      <a href="mailto:jaysonquindao@ggloop.io?subject=Anti-Cheat SDK - Indie Plan" class="price-btn price-btn-secondary">Get Started</a>
+      <button id="stripe-checkout-btn" class="price-btn price-btn-primary" style="width: 100%; border: none; cursor: pointer;">Subscribe (Stripe)</button>
     </div>
-    <div class="price-card featured">
-      <div class="featured-badge">Most Popular</div>
+    <div class="price-card">
       <div class="tier">Studio</div>
       <div class="price">$499<span>/mo</span></div>
       <div class="price-desc">For growing studios with live games and real players.</div>
@@ -254,7 +255,7 @@ guard.<span class="fn">start</span>();</pre>
         <li>Slack/Discord alerts</li>
         <li>Priority support</li>
       </ul>
-      <a href="mailto:jaysonquindao@ggloop.io?subject=Anti-Cheat SDK - Studio Plan" class="price-btn price-btn-primary">Start Free Trial</a>
+      <a href="mailto:jaysonquindao@ggloop.io?subject=Anti-Cheat SDK - Studio Plan" class="price-btn price-btn-secondary">Start Free Trial</a>
     </div>
     <div class="price-card">
       <div class="tier">Enterprise</div>
@@ -272,6 +273,39 @@ guard.<span class="fn">start</span>();</pre>
       <a href="mailto:jaysonquindao@ggloop.io?subject=Anti-Cheat SDK - Enterprise" class="price-btn price-btn-secondary">Contact Sales</a>
     </div>
   </div>
+
+  <script>
+    document.getElementById('stripe-checkout-btn').addEventListener('click', async () => {
+      const btn = document.getElementById('stripe-checkout-btn');
+      btn.innerText = 'Connecting...';
+      btn.disabled = true;
+
+      try {
+        const response = await fetch('http://localhost:3000/api/checkout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            priceId: 'price_1To4ahRqsNN4Xgy6qAyQ8zrY',
+            successUrl: window.location.href + '?session_id={CHECKOUT_SESSION_ID}',
+            cancelUrl: window.location.href
+          })
+        });
+
+        const result = await response.json();
+        if (response.ok && result.url) {
+          window.location.href = result.url;
+        } else {
+          alert('⚠️ Stripe Error: ' + (result.error || 'Failed to initialize checkout session'));
+          btn.innerText = 'Subscribe (Stripe)';
+          btn.disabled = false;
+        }
+      } catch (err) {
+        alert('❌ Error: Could not connect to local server backend. Make sure it is running!');
+        btn.innerText = 'Subscribe (Stripe)';
+        btn.disabled = false;
+      }
+    });
+  </script>
 </section>
 
 <section class="cta-section" id="contact">
