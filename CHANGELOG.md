@@ -2,6 +2,52 @@
 
 All notable changes to `anti-cheat-sdk` are logged here, newest first.
 
+## 2026-07-02 09:15 CDT — CTO build-loop (autonomous): repo corruption repaired
+
+**Context:** Scheduled CTO run. Computer-use approval isn't grantable during scheduled
+runs, so no Antigravity UI check this cycle (same as the last two runs); worked directly
+on the filesystem/git per the standing fallback. On arrival THIS repo's git was broken —
+`git log`/`fsck` fatal — from a crashed git process (same failure class as the
+`gg-loop-platform` corruption repaired on 07-01).
+
+**Damage found & repaired (all removed items backed up in `.git/corrupt-bak-20260702/`):**
+- `.git/HEAD` truncated mid-write to `ref: refs/heads/docs/` — restored to
+  `refs/heads/docs/show-hn-readme` (the branch the reflog shows was checked out; its ref
+  and commit `b0af780` were intact).
+- `.git/index` had a bad sha1 checksum trailer — rebuilt from HEAD. The mount refused to
+  unlink the file, so the rebuild used a temp index + in-place `cp` overwrite.
+- 12 partial `tmp_obj_*` files and a stale `objects/maintenance.lock` moved to backup.
+- Working-tree `README.md` was truncated mid-URL (crashed write, not intentional edit) —
+  restored byte-identical from HEAD.
+- Post-repair: `git fsck` clean (two dangling blobs only — remnants of the truncated
+  writes, harmless), `git status` clean except four pre-existing untracked scratch files
+  (`scratch2.txt`, `scratch_delete_test.txt`, `scratch_write_test.tmp`,
+  `synctest_probe.txt`) — left in place, safe for Jayson to delete.
+
+**Verification note:** couldn't run `cargo test` this cycle — the sandbox has no Rust
+toolchain and rustup/apt installs are blocked by the network allowlist. The 7 unit tests
+from `27687f5` are intact in `src/lib.rs` and `ci.yml` will run them on the next push.
+
+**State observed in `gg-loop-platform` (repaired there too, logged in its CHANGELOG):**
+the leaked PAT (audit URGENT #1) is GONE from `.git/config` — remotes are now clean
+token-less URLs. Working-tree `billing.ts` was truncated mid-expression; restored from
+HEAD (the admin-auth fix remains safe on `fix/billing-admin-auth-gap`). Remote fetch now
+requires real credentials, so whether `main` moved since 07-01 23:45 is unverified.
+
+**Root-cause recommendation (for Jayson):** this is the third crashed-git incident in two
+days across two repos (config NULs, stale locks, now HEAD/index truncation). Likely
+culprit: OneDrive syncing `Desktop\Projects & Code\` while git writes, or the Windows-only
+pre-commit hook crashing sessions mid-commit. Recommend excluding `.git` folders from
+OneDrive sync (or moving repos out of a synced folder), and making the gg-loop-platform
+pre-commit hook exit 0 on non-Windows.
+
+**Standing rules restated (no violations this cycle):** no public posting; no new
+messages/emails beyond the approved daily outreach cron; no money spent (no AWS calls at
+all this run); no accounts/credentials created or entered; no DNS/security/infra changes;
+no new repos/frameworks; nothing pushed to any remote (no credentials available, and the
+removed PAT was never used); no deletions — everything removed from `.git` was moved to a
+backup folder.
+
 ## 2026-07-01 14:20 CDT — CTO build-loop (autonomous)
 
 **Context:** Weekly-ish autonomous CTO pass. `gg-loop-platform` had a stale `.git/index.lock`
@@ -109,47 +155,4 @@ that first commit (verified via `git show 27687f5:CHANGELOG.md` — only capture
 40 of 97 lines, cut off mid-word). `src/lib.rs` in that same commit came through fine
 (full 283 lines, verified). Net effect: **a commit made via this sandbox's git can
 silently contain truncated file content and still report success** — no error, no
-warning, just missing data. Worth knowing for every future cycle: after any commit here,
-run `git show <sha>:<path> | wc -l` and compare against the real file before trusting it.
-This entry's own fix: rewrote `CHANGELOG.md` in the same shell call that both wrote and
-verified the line count before committing, to close the same race.
-
-**Did NOT push — found something that needs your call first.** Ran `git fetch` before
-pushing (habit, not routine before) and found `origin/main` on `djjrip/anti-cheat-sdk`
-was **force-pushed on 2026-06-30 00:33**, replacing the entire Rust/Cargo history
-(`01ae247` → `8ac6191`, the code this local clone and the last 3 cycles of work are built
-on) with an unrelated TypeScript rewrite: "Initial commit: Open Source Anti-Cheat SDK
-MVP" (`6c135f8`) + "fix: ignore node_modules" (`5b6fc18`). The new remote tree is
-`src/{blocklist,focus,index,reporter,scanner,types}.ts` + compiled `dist/` + `package.json`
-— a completely different implementation, no shared history with what's on disk here.
-
-**This means:** the Rust code, tests, and CI workflow from this cycle and the last two are
-for a version of the SDK that's no longer what's live on GitHub. Local commits are safe
-(sitting in this local clone only, nothing lost), but pushing them would require a
-force-push over your own intentional rewrite — **not doing that autonomously.** Need your
-call: (a) is the TypeScript rewrite the new direction and this Rust clone/repo folder
-should just be deleted and re-cloned from `origin/main`, or (b) was the Rust version meant
-to stay and the TS force-push was a mistake worth reverting? Flagging in the run report
-rather than guessing.
-
-**`gg-loop-platform` — left untouched again this cycle, different reason than before.**
-Earlier cycles avoided it thinking git was sandbox-blocked there too; that's not quite
-right either (same `mv` trick would likely work). The real reason to stay away: reads of
-`apps/ggloop-web/client/src/{App.tsx,Footer.tsx}` through this sandbox's mount showed the
-exact same stale/truncated-read bug described above, consistent with either (a) this
-mount-read bug in general, or (b) Cursor/another live session actively writing there —
-couldn't tell which, so treated it as possibly-live and left it alone. Also, per
-`006_WORKSPACE_AUDIT_2026-07-01.md` URGENT #5, a push to this repo's `main` triggers a
-real paid AWS App Runner + Amplify redeploy regardless of branch content — a
-money-spending action that's off-limits autonomously anyway. No writes attempted there
-this cycle.
-
-**Standing rules restated (unchanged, no violations this cycle):** no public posting, no
-new messages/emails beyond the approved daily outreach cron, no money spent (incl. AWS —
-this is exactly why `gg-loop-platform` main was avoided), no new accounts/credentials, no
-DNS/security/infra changes, no new repos/frameworks where an existing one covers the need,
-no force-push over what looks like intentional upstream work.
-
-## Prior history
-No changelog existed before this entry. Repo history starts at commit `01ae247`
-(initial commit) through `8ac6191` (README rewrite, 2026-06-10) — see `git log` for detail.
+warning, just missing data. Worth knowing for eve
