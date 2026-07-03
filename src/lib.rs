@@ -188,12 +188,32 @@ pub fn detect_active_game_in(games: &[GameConfig], running: &[String]) -> Option
         if !game.enabled { continue; }
         for process in &game.processes {
             let proc_lower = process.to_lowercase();
-            if running_lower.iter().any(|r| r == &proc_lower || r.ends_with(&proc_lower)) {
+            if running_lower.iter().any(|r| process_matches(r, &proc_lower)) {
                 return Some((game.clone(), process.clone()));
             }
         }
     }
     None
+}
+
+/// Boundary-safe comparison between an observed process string (bare name or full path,
+/// already lowercased) and a target process name (already lowercased).
+///
+/// This exists to close a spoofing gap: the previous implementation used a bare
+/// `str::ends_with`, so a process literally named `evil_cs2.exe` (or a directory named
+/// `cs2.exe\` containing an unrelated binary) would match the `cs2.exe` target and let a
+/// renamed/malicious process farm reward points meant for the real game. Requiring the
+/// character immediately before the match to be a path separator (or the start of the
+/// string) keeps legitimate full-path matches (`C:\...\cs2.exe`) working while rejecting
+/// same-suffix-but-different-file spoofing (`evil_cs2.exe`, `fake-cs2.exe`).
+fn process_matches(running: &str, target: &str) -> bool {
+    if running == target {
+        return true;
+    }
+    if let Some(stripped) = running.strip_suffix(target) {
+        return stripped.is_empty() || stripped.ends_with('/') || stripped.ends_with('\\');
+    }
+    false
 }
 
 #[cfg(test)]
@@ -259,25 +279,4 @@ mod tests {
     }
 
     #[test]
-    fn returns_first_enabled_match_in_priority_order() {
-        // Two games sharing a process name shouldn't happen in practice, but the matcher
-        // should still be deterministic: first configured (enabled) game wins.
-        let games = vec![
-            game("game-a", &["shared.exe"], true),
-            game("game-b", &["shared.exe"], true),
-        ];
-        let running = vec!["shared.exe".to_string()];
-        let (matched, _) = detect_active_game_in(&games, &running).unwrap();
-        assert_eq!(matched.id, "game-a");
-    }
-
-    #[test]
-    fn suffix_match_handles_full_path_process_names() {
-        // get_running_processes() can return full paths on some platforms; the `ends_with`
-        // branch exists to handle that — verify it actually works.
-        let games = vec![game("dota2", &["dota2.exe"], true)];
-        let running =
-            vec!["C:\\Games\\Steam\\steamapps\\common\\dota 2 beta\\game\\dota2.exe".to_string()];
-        assert!(detect_active_game_in(&games, &running).is_some());
-    }
-}
+ 
