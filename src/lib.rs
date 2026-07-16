@@ -279,4 +279,46 @@ mod tests {
     }
 
     #[test]
+    fn returns_first_enabled_match_in_priority_order() {
+        // Two games sharing a process name shouldn't happen in practice, but the matcher
+        // should still be deterministic: first configured (enabled) game wins.
+        let games = vec![
+            game("game-a", &["shared.exe"], true),
+            game("game-b", &["shared.exe"], true),
+        ];
+        let running = vec!["shared.exe".to_string()];
+        let (matched, _) = detect_active_game_in(&games, &running).unwrap();
+        assert_eq!(matched.id, "game-a");
+    }
+
+    #[test]
+    fn suffix_match_handles_full_path_process_names() {
+        // get_running_processes() can return full paths on some platforms; process_matches'
+        // path-boundary branch exists to handle that — verify it actually works.
+        let games = vec![game("dota2", &["dota2.exe"], true)];
+        let running =
+            vec!["C:\\Games\\Steam\\steamapps\\common\\dota 2 beta\\game\\dota2.exe".to_string()];
+        assert!(detect_active_game_in(&games, &running).is_some());
+    }
+
+    #[test]
+    fn rejects_same_suffix_spoofed_process_name() {
+        // Regression test for the spoofing gap process_matches was added to close:
+        // a process named "evil_cs2.exe" must NOT match a "cs2.exe" target just because
+        // the string happens to end with it.
+        let games = vec![game("cs2", &["cs2.exe"], true)];
+        let running = vec!["evil_cs2.exe".to_string()];
+        assert!(detect_active_game_in(&games, &running).is_none());
+    }
+
+    #[test]
+    fn rejects_spoofed_directory_prefix_without_separator() {
+        // "fake-cs2.exe" (no path separator before the match) must also be rejected —
+        // only an exact match or a match immediately preceded by a path separator counts.
+        assert!(!process_matches("fake-cs2.exe", "cs2.exe"));
+        assert!(process_matches("cs2.exe", "cs2.exe"));
+        assert!(process_matches("c:\\games\\cs2.exe", "cs2.exe"));
+        assert!(process_matches("c:/games/cs2.exe", "cs2.exe"));
+    }
+}
  
