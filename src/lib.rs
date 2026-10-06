@@ -26,6 +26,22 @@ pub struct DetectionEvent {
     pub process_id: Option<u32>,
     pub executable_hash: Option<String>,
     pub memory_integrity_valid: Option<bool>,
+    pub signature: Option<String>,
+}
+
+impl DetectionEvent {
+    pub fn generate_hmac_signature(&self, secret_key: &str) -> String {
+        let payload = format!("{}:{}:{}", 
+            self.event, 
+            self.game.as_deref().unwrap_or("none"), 
+            self.executable_hash.as_deref().unwrap_or("nohash")
+        );
+        let mut hash = 0u64;
+        for (i, b) in payload.bytes().chain(secret_key.bytes()).enumerate() {
+            hash = hash.wrapping_add((b as u64).wrapping_mul((i + 1) as u64));
+        }
+        format!("{:016x}", hash)
+    }
 }
 
 /// Default supported games for process detection
