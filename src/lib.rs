@@ -23,6 +23,9 @@ pub struct DetectionEvent {
     pub game: Option<String>,
     pub session: Option<ActiveSession>,
     pub points_awarded: Option<i64>,
+    pub process_id: Option<u32>,
+    pub executable_hash: Option<String>,
+    pub memory_integrity_valid: Option<bool>,
 }
 
 /// Default supported games for process detection
