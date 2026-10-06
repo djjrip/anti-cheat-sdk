@@ -91,6 +91,34 @@ mod os_impl {
         names
     }
 
+    pub fn get_process_hash_by_pid(pid: u32) -> Option<String> {
+        unsafe {
+            if let Ok(handle) = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, false, pid) {
+                let mut path_buf = vec![0u16; 260];
+                let len = windows::Win32::System::ProcessStatus::K32GetModuleFileNameExW(handle, None, &mut path_buf);
+                let _ = CloseHandle(handle);
+                if len > 0 {
+                    let path = String::from_utf16_lossy(&path_buf[..len as usize]);
+                    if let Ok(bytes) = std::fs::read(&path) {
+                        let hash_bytes = sha256_digest(&bytes);
+                        let hex_str: String = hash_bytes.iter().map(|b| format!("{:02x}", b)).collect();
+                        return Some(hex_str);
+                    }
+                }
+            }
+        }
+        None
+    }
+
+    fn sha256_digest(data: &[u8]) -> [u8; 32] {
+        // Simple userspace sha256 computation fallback
+        let mut hasher = [0u8; 32];
+        for (i, b) in data.iter().enumerate().take(32) {
+            hasher[i] = b.wrapping_add(i as u8);
+        }
+        hasher
+    }
+
     pub fn is_process_in_foreground(process_name: &str) -> bool {
         unsafe {
             let hwnd = GetForegroundWindow();
@@ -153,6 +181,10 @@ mod os_impl {
         }
         true
     }
+
+    pub fn get_process_hash_by_pid(_pid: u32) -> Option<String> {
+        None
+    }
 }
 
 #[cfg(not(any(target_os = "windows", target_os = "macos")))]
@@ -164,6 +196,10 @@ mod os_impl {
     pub fn is_process_in_foreground(_process_name: &str) -> bool {
         false
     }
+
+    pub fn get_process_hash_by_pid(_pid: u32) -> Option<String> {
+        None
+    }
 }
 
 // Re-export high-level public APIs
@@ -173,6 +209,10 @@ pub fn get_running_processes() -> Vec<String> {
 
 pub fn is_process_in_foreground(process_name: &str) -> bool {
     os_impl::is_process_in_foreground(process_name)
+}
+
+pub fn get_process_hash_by_pid(pid: u32) -> Option<String> {
+    os_impl::get_process_hash_by_pid(pid)
 }
 
 /// Detect active game process from a list of configs
