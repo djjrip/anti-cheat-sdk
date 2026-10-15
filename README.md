@@ -74,12 +74,11 @@ Because we prioritize user privacy and system stability (no kernel drivers), thi
 
 ---
 
-## Cloud Infrastructure & Dashboard
+## Telemetry Architecture & Automotive Benchmark
 
-Need managed telemetry, blocklist updates, discord alerts, and an analytics dashboard? 
-We offer a managed cloud tier that wires this SDK directly into a secure backend.
+This SDK was engineered to provide ultra-fast, tamper-proof session verification with sub-millisecond overhead.
 
-👉 **[Check out the GG Loop Cloud Tier ($29/mo)](https://ggloop.io)**
+Check out the connected vehicle telemetry pipeline benchmark in [`examples/automotive_telemetry_stream.rs`](examples/automotive_telemetry_stream.rs), clocking **140,000+ signed sensor frames/sec** with zero garbage collection jitter.
 
 ---
 
