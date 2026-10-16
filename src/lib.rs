@@ -1,5 +1,11 @@
 use serde::{Deserialize, Serialize};
 
+pub mod corporate_security;
+pub use corporate_security::{
+    compute_sha256, hash_to_hex, EnforcementMode, SecurityAuditEvent, Verdict,
+    ZeroTrustAuditor, ZeroTrustPolicy,
+};
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct GameConfig {
     pub id: String,

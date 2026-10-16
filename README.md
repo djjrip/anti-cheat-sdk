@@ -60,6 +60,7 @@ fn main() {
 - **Cross-platform capability**: Unified API surface utilizing Win32 API on Windows and `ps`/AppleScript on macOS.
 - **Zero dependencies**: Pure Rust implementation with direct OS system calls.
 - **Custom game support**: Easily pass your own `GameConfig` structs to track any arbitrary `.exe` or process.
+- **Corporate Zero-Trust & SOC 2 Auditing**: Enterprise-grade binary checksum validation (FIPS 180-4 SHA-256), parent-process ancestry inspection, policy enforcement (`AuditOnly`, `Quarantine`, `Block`), and cryptographically signed audit logs.
 
 ---
 
