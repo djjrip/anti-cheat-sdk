@@ -1,10 +1,12 @@
 use serde::{Deserialize, Serialize};
 
 pub mod corporate_security;
+pub mod ffi;
 pub use corporate_security::{
     compute_sha256, hash_to_hex, EnforcementMode, SecurityAuditEvent, Verdict,
     ZeroTrustAuditor, ZeroTrustPolicy,
 };
+pub use ffi::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct GameConfig {

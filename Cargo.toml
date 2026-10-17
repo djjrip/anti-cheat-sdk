@@ -1,11 +1,19 @@
 [package]
 name = "anti-cheat-sdk"
-version = "0.1.0"
+version = "1.0.0"
 edition = "2021"
 authors = ["Jayson Quindao <djjrip>"]
-description = "A lightweight, zero-overhead process scanning and active-window focus tracking SDK for Windows and macOS."
+description = "Enterprise-grade zero-overhead process scanning, binary integrity verification, and focus tracking SDK for Windows and macOS."
 license = "MIT"
 readme = "README.md"
+
+[lib]
+name = "anti_cheat_sdk"
+crate-type = ["rlib", "cdylib"]
+
+[[bin]]
+name = "ggloop-sentry"
+path = "src/main.rs"
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }

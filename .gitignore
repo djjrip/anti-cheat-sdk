@@ -5,3 +5,4 @@ Cargo.lock
 .idea/
 .vscode/
 _pending-patches/
+/dist
