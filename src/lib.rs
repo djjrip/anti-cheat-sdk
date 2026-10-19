@@ -3,8 +3,8 @@ use serde::{Deserialize, Serialize};
 pub mod corporate_security;
 pub mod ffi;
 pub use corporate_security::{
-    compute_sha256, hash_to_hex, EnforcementMode, SecurityAuditEvent, Verdict,
-    ZeroTrustAuditor, ZeroTrustPolicy,
+    compute_hmac_sha256, compute_sha256, hash_to_hex, verify_hmac_sha256_hex,
+    EnforcementMode, SecurityAuditEvent, Verdict, ZeroTrustAuditor, ZeroTrustPolicy,
 };
 pub use ffi::*;
 
@@ -37,18 +37,39 @@ pub struct DetectionEvent {
     pub signature: Option<String>,
 }
 
+#[derive(Serialize)]
+struct DetectionEventSigningPayload<'a> {
+    event: &'a str,
+    game: Option<&'a str>,
+    session: &'a Option<ActiveSession>,
+    points_awarded: &'a Option<i64>,
+    process_id: &'a Option<u32>,
+    executable_hash: &'a Option<String>,
+    memory_integrity_valid: &'a Option<bool>,
+}
+
 impl DetectionEvent {
+    fn signing_payload(&self) -> Vec<u8> {
+        let payload = DetectionEventSigningPayload {
+            event: &self.event,
+            game: self.game.as_deref(),
+            session: &self.session,
+            points_awarded: &self.points_awarded,
+            process_id: &self.process_id,
+            executable_hash: &self.executable_hash,
+            memory_integrity_valid: &self.memory_integrity_valid,
+        };
+        serde_json::to_vec(&payload).expect("serializing detection event fields cannot fail")
+    }
+
+    /// Generate a standard HMAC-SHA-256 tag covering all event fields except the signature.
     pub fn generate_hmac_signature(&self, secret_key: &str) -> String {
-        let payload = format!("{}:{}:{}", 
-            self.event, 
-            self.game.as_deref().unwrap_or("none"), 
-            self.executable_hash.as_deref().unwrap_or("nohash")
-        );
-        let mut hash = 0u64;
-        for (i, b) in payload.bytes().chain(secret_key.bytes()).enumerate() {
-            hash = hash.wrapping_add((b as u64).wrapping_mul((i + 1) as u64));
-        }
-        format!("{:016x}", hash)
+        hash_to_hex(&compute_hmac_sha256(secret_key.as_bytes(), &self.signing_payload()))
+    }
+
+    /// Verify a signature generated for this exact event payload.
+    pub fn verify_hmac_signature(&self, secret_key: &str, signature_hex: &str) -> bool {
+        verify_hmac_sha256_hex(secret_key.as_bytes(), &self.signing_payload(), signature_hex)
     }
 }
 
@@ -294,6 +315,28 @@ mod tests {
             processes: processes.iter().map(|p| p.to_string()).collect(),
             enabled,
         }
+    }
+
+    #[test]
+    fn detection_event_hmac_covers_all_fields_and_verifies_key() {
+        let event = DetectionEvent {
+            event: "game_detected".into(),
+            game: Some("cs2".into()),
+            session: None,
+            points_awarded: Some(25),
+            process_id: Some(4242),
+            executable_hash: Some("abc123".into()),
+            memory_integrity_valid: Some(true),
+            signature: None,
+        };
+        let signature = event.generate_hmac_signature("test-key");
+        assert_eq!(signature.len(), 64);
+        assert!(event.verify_hmac_signature("test-key", &signature));
+        assert!(!event.verify_hmac_signature("wrong-key", &signature));
+
+        let mut tampered = event.clone();
+        tampered.points_awarded = Some(999);
+        assert!(!tampered.verify_hmac_signature("test-key", &signature));
     }
 
     #[test]

@@ -1,8 +1,12 @@
+use hmac::{Hmac, Mac};
 use serde::{Deserialize, Serialize};
+use sha2::Sha256;
 
-/// Zero-Trust Corporate Security Policy
-/// Designed for enterprise endpoint compliance, SOC 2 Type II auditing,
-/// and infrastructure access verification.
+type HmacSha256 = Hmac<Sha256>;
+
+/// Experimental process-policy evaluation for local security/audit workflows.
+/// Designed as an experimental policy-evaluation and audit-event prototype.
+/// It does not provide or certify SOC 2 compliance.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ZeroTrustPolicy {
     pub policy_id: String,
@@ -28,7 +32,7 @@ pub enum Verdict {
     Deny,
 }
 
-/// Structured SOC 2 Type II compliant audit event
+/// Structured audit event record; not a SOC 2 compliance assertion.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct SecurityAuditEvent {
     pub event_id: String,
@@ -143,6 +147,83 @@ pub fn hash_to_hex(hash: &[u8; 32]) -> String {
     hash.iter().map(|b| format!("{:02x}", b)).collect()
 }
 
+/// Compute a standard HMAC-SHA-256 message authentication code.
+pub fn compute_hmac_sha256(key: &[u8], data: &[u8]) -> [u8; 32] {
+    let mut mac = HmacSha256::new_from_slice(key)
+        .expect("HMAC-SHA-256 accepts keys of any length");
+    mac.update(data);
+    let tag = mac.finalize().into_bytes();
+    let mut out = [0u8; 32];
+    out.copy_from_slice(&tag);
+    out
+}
+
+fn hex_nibble(byte: u8) -> Option<u8> {
+    match byte {
+        b'0'..=b'9' => Some(byte - b'0'),
+        b'a'..=b'f' => Some(byte - b'a' + 10),
+        b'A'..=b'F' => Some(byte - b'A' + 10),
+        _ => None,
+    }
+}
+
+/// Verify a hex-encoded HMAC-SHA-256 tag using the crate's constant-time tag check.
+pub fn verify_hmac_sha256_hex(key: &[u8], data: &[u8], signature_hex: &str) -> bool {
+    let encoded = signature_hex.as_bytes();
+    if encoded.len() != 64 {
+        return false;
+    }
+
+    let mut signature = [0u8; 32];
+    for (index, out) in signature.iter_mut().enumerate() {
+        let Some(high) = hex_nibble(encoded[index * 2]) else {
+            return false;
+        };
+        let Some(low) = hex_nibble(encoded[index * 2 + 1]) else {
+            return false;
+        };
+        *out = (high << 4) | low;
+    }
+
+    let Ok(mut mac) = HmacSha256::new_from_slice(key) else {
+        return false;
+    };
+    mac.update(data);
+    mac.verify_slice(&signature).is_ok()
+}
+
+#[derive(Serialize)]
+struct SecurityAuditEventPayload<'a> {
+    event_id: &'a str,
+    timestamp_epoch_ms: u64,
+    actor_id: &'a str,
+    process_name: &'a str,
+    process_id: u32,
+    binary_hash: &'a str,
+    parent_process_name: Option<&'a str>,
+    verdict: Verdict,
+    risk_score: u32,
+    reason: &'a str,
+    policy_id: &'a str,
+}
+
+fn audit_event_payload(event: &SecurityAuditEvent) -> Vec<u8> {
+    let payload = SecurityAuditEventPayload {
+        event_id: &event.event_id,
+        timestamp_epoch_ms: event.timestamp_epoch_ms,
+        actor_id: &event.actor_id,
+        process_name: &event.process_name,
+        process_id: event.process_id,
+        binary_hash: &event.binary_hash,
+        parent_process_name: event.parent_process_name.as_deref(),
+        verdict: event.verdict,
+        risk_score: event.risk_score,
+        reason: &event.reason,
+        policy_id: &event.policy_id,
+    };
+    serde_json::to_vec(&payload).expect("serializing audit event fields cannot fail")
+}
+
 pub struct ZeroTrustAuditor {
     policy: ZeroTrustPolicy,
     signing_secret: String,
@@ -209,10 +290,7 @@ impl ZeroTrustAuditor {
             reasons.join(" | ")
         };
 
-        // Cryptographic Signature Generation
-        let signature = self.sign_event(event_id, &binary_hash, risk_score, &verdict);
-
-        SecurityAuditEvent {
+        let mut event = SecurityAuditEvent {
             event_id: event_id.to_string(),
             timestamp_epoch_ms,
             actor_id: actor_id.to_string(),
@@ -224,26 +302,40 @@ impl ZeroTrustAuditor {
             risk_score,
             reason: reason_text,
             policy_id: self.policy.policy_id.clone(),
-            signature,
-        }
+            signature: String::new(),
+        };
+        event.signature = self.sign_event(&event);
+        event
     }
 
-    fn sign_event(&self, event_id: &str, binary_hash: &str, risk_score: u32, verdict: &Verdict) -> String {
-        let payload = format!("{}:{}:{}:{:?}:{}", event_id, binary_hash, risk_score, verdict, self.signing_secret);
-        let digest = compute_sha256(payload.as_bytes());
-        hash_to_hex(&digest)
+    fn sign_event(&self, event: &SecurityAuditEvent) -> String {
+        let payload = audit_event_payload(event);
+        hash_to_hex(&compute_hmac_sha256(self.signing_secret.as_bytes(), &payload))
     }
 
-    /// Verifies the authenticity and tamper-resistance of an audit event.
+    /// Verifies the event's HMAC over all serialized event fields except the signature.
     pub fn verify_signature(&self, event: &SecurityAuditEvent) -> bool {
-        let expected = self.sign_event(&event.event_id, &event.binary_hash, event.risk_score, &event.verdict);
-        expected == event.signature
+        verify_hmac_sha256_hex(
+            self.signing_secret.as_bytes(),
+            &audit_event_payload(event),
+            &event.signature,
+        )
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn hmac_sha256_matches_rfc4231_case_1() {
+        let key = [0x0bu8; 20];
+        let tag = compute_hmac_sha256(&key, b"Hi There");
+        assert_eq!(
+            hash_to_hex(&tag),
+            "b0344c61d8db38535ca8afceaf0bf12b881dc200c9833da726e9376c2e32cff7"
+        );
+    }
 
     #[test]
     fn test_sha256_known_vector() {
@@ -281,6 +373,9 @@ mod tests {
         assert_eq!(event.verdict, Verdict::Allow);
         assert_eq!(event.risk_score, 0);
         assert!(auditor.verify_signature(&event));
+        let mut tampered = event.clone();
+        tampered.actor_id.push_str("-modified");
+        assert!(!auditor.verify_signature(&tampered));
     }
 
     #[test]
@@ -315,12 +410,12 @@ mod tests {
     }
 
     #[test]
-    fn test_soc2_json_roundtrip() {
+    fn test_audit_event_json_roundtrip() {
         let sample_binary = b"binary_data";
         let hash = hash_to_hex(&compute_sha256(sample_binary));
         let policy = ZeroTrustPolicy {
-            policy_id: "POL-SOC2-AUDIT".into(),
-            name: "SOC 2 Type II Compliance Auditor".into(),
+            policy_id: "POL-AUDIT-001".into(),
+            name: "Sample Audit Policy".into(),
             allowed_binary_hashes: vec![hash],
             disallowed_parent_processes: vec![],
             enforcement_mode: EnforcementMode::AuditOnly,
@@ -340,7 +435,7 @@ mod tests {
 
         let json_repr = serde_json::to_string_pretty(&event).expect("Serialization failed");
         assert!(json_repr.contains("\"verdict\": \"Allow\""));
-        assert!(json_repr.contains("\"policy_id\": \"POL-SOC2-AUDIT\""));
+        assert!(json_repr.contains("\"policy_id\": \"POL-AUDIT-001\""));
 
         let deserialized: SecurityAuditEvent = serde_json::from_str(&json_repr).expect("Deserialization failed");
         assert_eq!(deserialized, event);

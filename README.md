@@ -1,6 +1,6 @@
 # GG Loop Anti-Cheat SDK
 
-> **Lightweight, privacy-first, user-space game session tracking.** 
+> **Experimental, privacy-oriented, user-space game-process and session tracking.** 
 > Detect active games and track playtime accurately without kernel drivers, admin rights, or privacy-invasive memory scans.
 
 [![Rust](https://img.shields.io/badge/rust-1.75%2B-orange)](https://www.rust-lang.org/)
@@ -58,9 +58,9 @@ fn main() {
 - **Real-time game process detection**: 18 titles pre-configured (Valorant, CS2, Apex, Fortnite, etc.)
 - **Foreground window tracking**: Know exactly when the player actually has the game open and focused.
 - **Cross-platform capability**: Unified API surface utilizing Win32 API on Windows and `ps`/AppleScript on macOS.
-- **Zero dependencies**: Pure Rust implementation with direct OS system calls.
+- **Small dependency footprint**: Rust implementation with direct OS system calls and focused serialization/cryptography crates.
 - **Custom game support**: Easily pass your own `GameConfig` structs to track any arbitrary `.exe` or process.
-- **Corporate Zero-Trust & SOC 2 Auditing**: Enterprise-grade binary checksum validation (FIPS 180-4 SHA-256), parent-process ancestry inspection, policy enforcement (`AuditOnly`, `Quarantine`, `Block`), and cryptographically signed audit logs.
+- **Policy/audit prototype**: SHA-256 file-integrity checks, parent-process name rules, and sample policy decisions with HMAC-SHA-256-authenticated event records. This is not a SOC 2 compliance product or a validated anti-cheat defense.
 
 ---
 
@@ -75,11 +75,9 @@ Because we prioritize user privacy and system stability (no kernel drivers), thi
 
 ---
 
-## Telemetry Architecture & Automotive Benchmark
+## Synthetic Telemetry Example
 
-This SDK was engineered to provide ultra-fast, tamper-proof session verification with sub-millisecond overhead.
-
-Check out the connected vehicle telemetry pipeline benchmark in [`examples/automotive_telemetry_stream.rs`](examples/automotive_telemetry_stream.rs), clocking **140,000+ signed sensor frames/sec** with zero garbage collection jitter.
+[`examples/automotive_telemetry_stream.rs`](examples/automotive_telemetry_stream.rs) demonstrates signing and verifying synthetic telemetry frames with HMAC-SHA-256 and includes a local throughput loop. The observed rate depends on hardware, build mode, and workload; it is not an independently validated production benchmark. Rust does not use a garbage-collected runtime, so garbage-collection claims are not meaningful performance evidence.
 
 ---
 
