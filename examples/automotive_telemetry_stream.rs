@@ -1,3 +1,4 @@
+use anti_cheat_sdk::{compute_hmac_sha256, hash_to_hex, verify_hmac_sha256_hex};
 use serde::{Deserialize, Serialize};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -12,40 +13,48 @@ pub struct VehicleTelemetryFrame {
     pub signature: Option<String>,
 }
 
+#[derive(Serialize)]
+struct UnsignedVehicleTelemetryFrame<'a> {
+    vehicle_vin: &'a str,
+    speed_kph: f64,
+    engine_rpm: u32,
+    battery_temp_c: f64,
+    brake_pressure_psi: f64,
+    timestamp_ms: u64,
+}
+
 impl VehicleTelemetryFrame {
-    /// Generates a cryptographic HMAC signature to prevent in-transit telemetry tampering
-    pub fn sign_frame(&mut self, secret_key: &str) {
-        let payload = format!(
-            "{}:{}:{:.2}:{}:{:.2}",
-            self.vehicle_vin, self.timestamp_ms, self.speed_kph, self.engine_rpm, self.battery_temp_c
-        );
-        let mut hash = 0u64;
-        for (i, b) in payload.bytes().chain(secret_key.bytes()).enumerate() {
-            hash = hash.wrapping_add((b as u64).wrapping_mul((i + 1) as u64));
-        }
-        self.signature = Some(format!("{:016x}", hash));
+    fn signing_payload(&self) -> Vec<u8> {
+        let payload = UnsignedVehicleTelemetryFrame {
+            vehicle_vin: &self.vehicle_vin,
+            speed_kph: self.speed_kph,
+            engine_rpm: self.engine_rpm,
+            battery_temp_c: self.battery_temp_c,
+            brake_pressure_psi: self.brake_pressure_psi,
+            timestamp_ms: self.timestamp_ms,
+        };
+        serde_json::to_vec(&payload).expect("serializing telemetry fields cannot fail")
     }
 
-    /// Validates the frame signature with zero allocations
+    /// Sign every telemetry field except the signature using standard HMAC-SHA-256.
+    pub fn sign_frame(&mut self, secret_key: &str) {
+        let tag = compute_hmac_sha256(secret_key.as_bytes(), &self.signing_payload());
+        self.signature = Some(hash_to_hex(&tag));
+    }
+
+    /// Verify the supplied HMAC-SHA-256 tag using a constant-time comparison.
     pub fn verify_signature(&self, secret_key: &str) -> bool {
-        let payload = format!(
-            "{}:{}:{:.2}:{}:{:.2}",
-            self.vehicle_vin, self.timestamp_ms, self.speed_kph, self.engine_rpm, self.battery_temp_c
-        );
-        let mut hash = 0u64;
-        for (i, b) in payload.bytes().chain(secret_key.bytes()).enumerate() {
-            hash = hash.wrapping_add((b as u64).wrapping_mul((i + 1) as u64));
-        }
-        let expected = format!("{:016x}", hash);
-        self.signature.as_deref() == Some(&expected)
+        self.signature.as_deref().map_or(false, |signature| {
+            verify_hmac_sha256_hex(secret_key.as_bytes(), &self.signing_payload(), signature)
+        })
     }
 }
 
 fn main() {
     println!("=== Connected Vehicle Telemetry Ingestion Pipeline (Rust) ===");
-    println!("Architecture: Deterministic Memory, Zero Garbage Collection, Anti-Tamper HMAC");
+    println!("Architecture: Rust telemetry example with HMAC-SHA-256 integrity checks");
 
-    let secret_key = "toyota_connected_telemetry_secure_key";
+    let secret_key = "local_demo_key_not_for_production";
     let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis() as u64;
 
     let mut frame = VehicleTelemetryFrame {
@@ -87,6 +96,6 @@ fn main() {
     }
     let elapsed = start.elapsed();
     println!("   -> Processed and verified 10,000 signed telemetry frames in: {:?}", elapsed);
-    println!("   -> Ingestion rate: {:.0} frames/second (Zero Garbage Collection Pauses)", 10000.0 / elapsed.as_secs_f64());
-    println!("\n[SUCCESS] Production-ready Rust connected telemetry pipeline verified.");
+    println!("   -> Synthetic workload rate: {:.0} frames/second (build- and machine-dependent)", 10000.0 / elapsed.as_secs_f64());
+    println!("\n[COMPLETE] Synthetic signing and verification example passed.");
 }
