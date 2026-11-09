@@ -156,12 +156,7 @@ mod os_impl {
     }
 
     fn sha256_digest(data: &[u8]) -> [u8; 32] {
-        // Simple userspace sha256 computation fallback
-        let mut hasher = [0u8; 32];
-        for (i, b) in data.iter().enumerate().take(32) {
-            hasher[i] = b.wrapping_add(i as u8);
-        }
-        hasher
+        crate::compute_sha256(data)
     }
 
     pub fn is_process_in_foreground(process_name: &str) -> bool {
